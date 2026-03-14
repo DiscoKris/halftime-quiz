@@ -7,6 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { ADMIN_NAV_SECTIONS, ADMIN_ROUTES, BRAND_ASSETS } from '../../lib/constants';
 import { auth, db } from '../../lib/firebaseConfig.js';
+import { getFirebaseConfigError } from '../../lib/firebase/client';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +19,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPublicAdminRoute) {
       setState('allowed');
+      return;
+    }
+
+    if (!auth || !db) {
+      setState('denied');
       return;
     }
 
@@ -59,7 +65,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <main className="grid min-h-screen place-items-center bg-neutral-950 text-white">
         <div className="space-y-3 text-center">
           <div className="text-xl font-semibold">Access denied</div>
-          <p className="opacity-80">You must be an active admin to view this area.</p>
+          <p className="opacity-80">
+            {(!auth || !db) ? getFirebaseConfigError() : 'You must be an active admin to view this area.'}
+          </p>
           <Link
             href={ADMIN_ROUTES.login}
             className="inline-block rounded-lg bg-emerald-500 px-4 py-2 font-semibold text-black transition hover:bg-emerald-600"

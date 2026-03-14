@@ -13,6 +13,7 @@ import {
   createUserWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "../../lib/firebaseConfig";
+import { getFirebaseConfigError } from "../../lib/firebase/client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,6 +30,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      if (!auth) {
+        throw new Error(getFirebaseConfigError());
+      }
       await setPersistence(
         auth,
         stayLoggedIn ? browserLocalPersistence : browserSessionPersistence
@@ -46,6 +50,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      if (!auth) {
+        throw new Error(getFirebaseConfigError());
+      }
       await setPersistence(
         auth,
         stayLoggedIn ? browserLocalPersistence : browserSessionPersistence
@@ -63,6 +70,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      if (!auth) {
+        throw new Error(getFirebaseConfigError());
+      }
       await setPersistence(
         auth,
         stayLoggedIn ? browserLocalPersistence : browserSessionPersistence
@@ -84,6 +94,9 @@ export default function LoginPage() {
       return;
     }
     try {
+      if (!auth) {
+        throw new Error(getFirebaseConfigError());
+      }
       await sendPasswordResetEmail(auth, email.trim());
       setError("Password reset email sent.");
     } catch (err) {

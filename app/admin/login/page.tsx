@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebas
 import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
 import { ADMIN_ROUTES, BRAND_ASSETS } from "../../../lib/constants";
 import { auth, db } from "../../../lib/firebaseConfig.js";
+import { getFirebaseConfigError } from "../../../lib/firebase/client";
 
 type AdminProfile = {
   role?: string;
@@ -16,6 +17,10 @@ type AdminProfile = {
 };
 
 async function resolveLoginEmail(identifier: string) {
+  if (!db) {
+    throw new Error(getFirebaseConfigError());
+  }
+
   const normalized = identifier.trim();
 
   if (!normalized) {
@@ -44,6 +49,10 @@ async function resolveLoginEmail(identifier: string) {
 }
 
 async function getAdminAccessState(uid: string) {
+  if (!db) {
+    return false;
+  }
+
   const snapshot = await getDoc(doc(db, "users", uid));
 
   if (!snapshot.exists()) {
@@ -81,6 +90,12 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth) {
+      setError(getFirebaseConfigError());
+      setCheckingSession(false);
+      return;
+    }
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setCheckingSession(false);
@@ -113,6 +128,9 @@ export default function AdminLoginPage() {
     setError(null);
 
     try {
+      if (!auth) {
+        throw new Error(getFirebaseConfigError());
+      }
       const email = await resolveLoginEmail(identifier);
       const credential = await signInWithEmailAndPassword(auth, email, password);
       const isAllowed = await getAdminAccessState(credential.user.uid);

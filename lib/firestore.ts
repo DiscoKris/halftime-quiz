@@ -6,25 +6,33 @@ import {
   type DocumentReference,
 } from "firebase/firestore";
 import { COLLECTIONS, type CollectionName } from "./constants";
-import { db } from "./firebase/client";
+import { db, getFirebaseConfigError } from "./firebase/client";
 import type { FirestoreDateValue } from "../types/domain";
+
+function getRequiredDb() {
+  if (!db) {
+    throw new Error(getFirebaseConfigError());
+  }
+
+  return db;
+}
 
 export function collectionRef<T = DocumentData>(
   collectionName: CollectionName,
 ): CollectionReference<T> {
-  return collection(db, collectionName) as CollectionReference<T>;
+  return collection(getRequiredDb(), collectionName) as CollectionReference<T>;
 }
 
 export function documentRef<T = DocumentData>(
   collectionName: CollectionName,
   documentId: string,
 ): DocumentReference<T> {
-  return doc(db, collectionName, documentId) as DocumentReference<T>;
+  return doc(getRequiredDb(), collectionName, documentId) as DocumentReference<T>;
 }
 
 export function eventQuestionsCollectionRef<T = DocumentData>(eventId: string) {
   return collection(
-    db,
+    getRequiredDb(),
     COLLECTIONS.events,
     eventId,
     COLLECTIONS.eventQuestions,

@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { auth } from '../../../lib/firebaseConfig';
+import { getFirebaseConfigError } from '../../../lib/firebase/client';
 import {
   eventsService,
   leaderboardsService,
@@ -37,6 +38,12 @@ export default function QuizPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!auth) {
+      setError(getFirebaseConfigError());
+      setLoading(false);
+      return;
+    }
+
     const unsub = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
       if (!user) {
