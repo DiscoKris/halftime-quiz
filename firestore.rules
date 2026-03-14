@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().data.role in ['admin', 'superadmin']
+        && userDoc().data.isActive == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function ownerProfileCreateIsSafe(userId) {
+      return isOwner(userId)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.isActive == true
+        && request.resource.data.isPaid == false
+        && request.resource.data.email is string
+        && request.resource.data.username is string;
+    }
+
+    function ownerProfileUpdateIsSafe(userId) {
+      return isOwner(userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.isPaid == resource.data.isPaid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'username',
+          'city',
+          'state',
+          'country',
+          'lastLoginAt',
+          'updatedAt'
+        ]);
+    }
+
+    function eventIsPublic(eventId) {
+      return exists(/databases/$(database)/documents/events/$(eventId))
+        && get(/databases/$(database)/documents/events/$(eventId)).data.allowQuizPlay == true
+        && get(/databases/$(database)/documents/events/$(eventId)).data.isActive != false;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if ownerProfileCreateIsSafe(userId) || isAdmin();
+      allow update: if ownerProfileUpdateIsSafe(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /sports/{sportId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /leagues/{leagueId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /stadiums/{stadiumId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if (
+        resource.data.allowQuizPlay == true
+        || resource.data.leaderboardReadEnabled == true
+        || isAdmin()
+      );
+      allow write: if isAdmin();
+
+      match /eventQuestions/{eventQuestionId} {
+        allow read: if eventIsPublic(eventId) || isAdmin();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /questions/{questionId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /ads/{adId} {
+      allow read: if (
+        resource.data.status == 'active'
+        || isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    match /quizResults/{resultId} {
+      allow read: if isAdmin() || (
+        isSignedIn()
+        && resource.data.userId == request.auth.uid
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.eventId is string
+        && request.resource.data.score is int
+        && request.resource.data.timeSeconds is int
+        && request.resource.data.completedAt != null;
+
+      allow update, delete: if false;
+    }
+
+    match /leaderboards/{eventId} {
+      allow read: if (
+        resource.data != null
+        && (
+          eventIsPublic(eventId)
+          || isAdmin()
+        )
+      );
+      allow write: if false;
+    }
+
+    match /adminSettings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
