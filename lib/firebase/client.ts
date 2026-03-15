@@ -16,8 +16,34 @@ const OPTIONAL_FIREBASE_ENV_KEYS = [
   "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
 ] as const;
 
+const PUBLIC_ENV = {
+  NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+} as const;
+
+const FIREBASE_ENV_SHAPE_CHECKS = {
+  NEXT_PUBLIC_FIREBASE_API_KEY: (value: string) => value.length > 20,
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: (value: string) =>
+    /^[^.]+\.firebaseapp\.com$/i.test(value),
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: (value: string) =>
+    /^[a-z0-9-]+$/i.test(value),
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: (value: string) =>
+    /\.(appspot\.com|firebasestorage\.app)$/i.test(value),
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: (value: string) =>
+    /^\d+$/.test(value),
+  NEXT_PUBLIC_FIREBASE_APP_ID: (value: string) =>
+    /^1:\d+:web:[a-z0-9]+$/i.test(value),
+  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: (value: string) =>
+    /^G-[A-Z0-9]+$/i.test(value),
+} as const;
+
 function readEnv(name: string) {
-  return process.env[name];
+  return PUBLIC_ENV[name as keyof typeof PUBLIC_ENV];
 }
 
 export const firebaseConfig = {
@@ -37,14 +63,38 @@ function getMissingEnvKeys(keys: readonly string[]) {
   });
 }
 
+function getMalformedEnvKeys(keys: readonly string[]) {
+  return keys.filter((key) => {
+    const value = readEnv(key);
+
+    if (typeof value !== "string" || value.trim() === "") {
+      return false;
+    }
+
+    const validateShape = FIREBASE_ENV_SHAPE_CHECKS[key as keyof typeof FIREBASE_ENV_SHAPE_CHECKS];
+    return validateShape ? !validateShape(value.trim()) : false;
+  });
+}
+
 export const missingRequiredFirebaseEnvKeys = getMissingEnvKeys(REQUIRED_FIREBASE_ENV_KEYS);
 export const missingOptionalFirebaseEnvKeys = getMissingEnvKeys(OPTIONAL_FIREBASE_ENV_KEYS);
+export const malformedRequiredFirebaseEnvKeys = getMalformedEnvKeys(REQUIRED_FIREBASE_ENV_KEYS);
+export const malformedOptionalFirebaseEnvKeys = getMalformedEnvKeys(OPTIONAL_FIREBASE_ENV_KEYS);
 
-export const isFirebaseConfigured = missingRequiredFirebaseEnvKeys.length === 0;
+export const isFirebaseConfigured =
+  missingRequiredFirebaseEnvKeys.length === 0 &&
+  malformedRequiredFirebaseEnvKeys.length === 0;
+
+export const firebaseEnvDiagnostics = {
+  missingRequired: missingRequiredFirebaseEnvKeys,
+  missingOptional: missingOptionalFirebaseEnvKeys,
+  malformedRequired: malformedRequiredFirebaseEnvKeys,
+  malformedOptional: malformedOptionalFirebaseEnvKeys,
+} as const;
 
 if (!isFirebaseConfigured && process.env.NODE_ENV !== "production") {
   console.warn(
-    `[firebase] Missing required Firebase env vars: ${missingRequiredFirebaseEnvKeys.join(", ")}.`,
+    `[firebase] Firebase env diagnostics: missing required [${missingRequiredFirebaseEnvKeys.join(", ")}], malformed required [${malformedRequiredFirebaseEnvKeys.join(", ")}].`,
   );
 }
 
@@ -62,14 +112,16 @@ export const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : nu
 export const storage: FirebaseStorage | null = firebaseApp ? getStorage(firebaseApp) : null;
 
 export function getFirebaseConfigError() {
-  const missingKeys = [
+  const issues = [
     ...missingRequiredFirebaseEnvKeys,
     ...missingOptionalFirebaseEnvKeys.map((key) => `${key} (optional)`),
+    ...malformedRequiredFirebaseEnvKeys.map((key) => `${key} (malformed)`),
+    ...malformedOptionalFirebaseEnvKeys.map((key) => `${key} (optional malformed)`),
   ];
 
-  if (missingKeys.length === 0) {
+  if (issues.length === 0) {
     return "Firebase client is not configured. Required Firebase env vars are present, so verify the deployed build is current.";
   }
 
-  return `Firebase client is not configured. Missing Firebase env vars: ${missingKeys.join(", ")}.`;
+  return `Firebase client is not configured. Firebase env issues: ${issues.join(", ")}.`;
 }
