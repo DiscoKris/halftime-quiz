@@ -35,7 +35,8 @@ export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
 export const PUBLIC_ROUTES = {
   home: "/",
-  login: "/login",
+  login: "/",
+  about: "/about",
   choose: "/choose",
   sports: "/sports",
   quiz: "/quiz",

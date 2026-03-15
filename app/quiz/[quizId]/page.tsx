@@ -47,7 +47,7 @@ export default function QuizPage() {
     const unsub = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
       if (!user) {
-        router.replace('/login');
+        router.replace('/');
       }
     });
 
